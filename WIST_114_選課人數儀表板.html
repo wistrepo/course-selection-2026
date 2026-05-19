@@ -1,0 +1,478 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WIST 114學年度 選課人數分析</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg:       #0d1117;
+  --surface:  #161b22;
+  --surface2: #1c2330;
+  --border:   rgba(255,255,255,0.07);
+  --border2:  rgba(255,255,255,0.13);
+  --text:     #e6edf3;
+  --muted:    #7d8590;
+  --accent:   #2f81f7;
+  --radius:   12px;
+}
+html { scroll-behavior: smooth; }
+body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; overflow-x: hidden; }
+
+header {
+  padding: 3rem 2rem 2rem;
+  max-width: 1200px;
+  margin: 0 auto;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 2rem;
+  flex-wrap: wrap;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 2.5rem;
+}
+.school-tag {
+  font-family: 'DM Mono', monospace;
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  color: var(--accent);
+  background: rgba(47,129,247,0.1);
+  border: 1px solid rgba(47,129,247,0.25);
+  border-radius: 4px;
+  padding: 3px 10px;
+  display: inline-block;
+  margin-bottom: 0.75rem;
+}
+h1 { font-size: clamp(1.5rem,3vw,2.2rem); font-weight: 600; line-height: 1.2; letter-spacing: -0.02em; }
+h1 span { color: var(--accent); }
+.header-meta { font-size: 13px; color: var(--muted); margin-top: 0.5rem; }
+.kpi-row { display: flex; gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; flex-shrink: 0; }
+.kpi { background: var(--surface); padding: 1rem 1.75rem; text-align: center; }
+.kpi-val { font-family: 'DM Mono', monospace; font-size: 1.6rem; font-weight: 500; line-height: 1; }
+.kpi-lbl { font-size: 11px; color: var(--muted); margin-top: 5px; white-space: nowrap; }
+
+main { max-width: 1200px; margin: 0 auto; padding: 0 2rem 4rem; display: grid; gap: 2rem; }
+
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 1.5rem; }
+.card-title {
+  font-size: 13px; font-weight: 500; color: var(--muted);
+  letter-spacing: 0.06em; text-transform: uppercase;
+  margin-bottom: 1.25rem; display: flex; align-items: center; gap: 8px;
+}
+.card-title::before { content:''; display:inline-block; width:3px; height:13px; background:var(--accent); border-radius:2px; }
+.chart-wrap { position: relative; width: 100%; }
+
+.legend { display: flex; flex-wrap: wrap; gap: 8px 16px; margin-bottom: 1rem; font-size: 12px; color: var(--muted); }
+.legend span { display: flex; align-items: center; gap: 5px; }
+.legend b { display: inline-block; width: 10px; height: 10px; border-radius: 2px; flex-shrink: 0; }
+
+.grade-tabs { display: flex; gap: 6px; margin-bottom: 1.25rem; flex-wrap: wrap; }
+.gtab {
+  font-size: 12px; padding: 5px 16px;
+  border: 1px solid var(--border2); border-radius: 20px;
+  cursor: pointer; background: transparent; color: var(--muted); transition: all 0.15s;
+}
+.gtab:hover { border-color: var(--accent); color: var(--text); }
+.gtab.active { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 500; }
+
+.sort-bar { display: flex; align-items: center; gap: 10px; margin-bottom: 1rem; flex-wrap: wrap; }
+.sort-btn {
+  font-size: 12px; padding: 4px 12px;
+  border: 1px solid var(--border2); border-radius: 6px;
+  cursor: pointer; background: transparent; color: var(--muted); transition: all 0.15s;
+}
+.sort-btn.active { border-color: var(--accent); color: var(--accent); }
+.sort-lbl { font-size: 12px; color: var(--muted); }
+
+.tbl-wrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th {
+  text-align: left; font-size: 11px; font-weight: 500;
+  color: var(--muted); letter-spacing: 0.05em; text-transform: uppercase;
+  padding: 8px 12px; border-bottom: 1px solid var(--border);
+}
+td { padding: 8px 12px; border-bottom: 1px solid var(--border); color: var(--text); vertical-align: middle; }
+tr:last-child td { border-bottom: none; }
+tr.data-row:hover td { background: var(--surface2); }
+
+tr.group-header td {
+  background: var(--surface2);
+  font-size: 11px; font-weight: 500;
+  letter-spacing: 0.07em; text-transform: uppercase;
+  color: var(--muted); padding: 7px 12px;
+  border-top: 1px solid var(--border2);
+  border-bottom: 1px solid var(--border);
+  cursor: pointer; user-select: none;
+}
+tr.group-header:hover td { background: #21293a; }
+.gh-inner { display: flex; align-items: center; gap: 8px; }
+.gh-chevron { font-size: 9px; transition: transform 0.2s; display: inline-block; color: var(--muted); line-height: 1; }
+.gh-chevron.open { transform: rotate(90deg); }
+.gh-count { font-family: 'DM Mono', monospace; font-size: 11px; background: rgba(255,255,255,0.06); border-radius: 10px; padding: 1px 8px; }
+.gh-grade { font-size: 10px; color: var(--muted); background: rgba(255,255,255,0.04); border: 1px solid var(--border2); border-radius: 4px; padding: 1px 6px; letter-spacing: 0.04em; }
+.gh-bar-wrap { flex: 1; display: flex; align-items: center; gap: 8px; justify-content: flex-end; }
+.gh-bar-bg { background: rgba(255,255,255,0.07); border-radius: 3px; height: 4px; width: 100px; }
+.gh-bar-fill { height: 4px; border-radius: 3px; }
+
+.bar-bg { background: rgba(255,255,255,0.07); border-radius: 3px; height: 6px; width: 100%; }
+.bar-fill { height: 6px; border-radius: 3px; }
+.mono { font-family: 'DM Mono', monospace; }
+
+footer {
+  max-width: 1200px; margin: 0 auto; padding: 1.5rem 2rem;
+  border-top: 1px solid var(--border); font-size: 12px; color: var(--muted);
+  display: flex; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem;
+}
+@media (max-width: 640px) {
+  header { padding: 1.5rem 1rem; flex-direction: column; align-items: flex-start; }
+  main { padding: 0 1rem 3rem; }
+  .kpi-row { width: 100%; }
+  .kpi { flex: 1; padding: 0.75rem 0.5rem; }
+  .kpi-val { font-size: 1.2rem; }
+}
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <div class="school-tag">WIST · TAICHUNG · TAIWAN</div>
+    <h1>114 學年度<br><span>選課人數分析</span></h1>
+    <p class="header-meta">資料來源：11501學年選課樞紐 &nbsp;·&nbsp; 共 1,197 筆選課記錄</p>
+  </div>
+  <div class="kpi-row">
+    <div class="kpi"><div class="kpi-val">118</div><div class="kpi-lbl">開課門數</div></div>
+    <div class="kpi"><div class="kpi-val">17</div><div class="kpi-lbl">課程類別</div></div>
+  </div>
+</header>
+
+<main>
+
+  <div class="card">
+    <div class="card-title">各課程類別選課人數</div>
+    <div class="legend" id="cat-legend"></div>
+    <div class="chart-wrap" style="height:360px;">
+      <canvas id="catChart" role="img" aria-label="各課程類別選課人數橫向長條圖，Senior Electives 147人最多">Senior Electives 147人為最多</canvas>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">各課程詳細選課人數（依年級 &amp; 類別分組）</div>
+    <div class="grade-tabs" id="grade-tabs"></div>
+    <div class="sort-bar">
+      <span class="sort-lbl">類別內排序：</span>
+      <button class="sort-btn active" id="sort-count" onclick="setSort('count')">人數高→低</button>
+      <button class="sort-btn" id="sort-alpha" onclick="setSort('alpha')">課程名稱 A→Z</button>
+    </div>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr>
+          <th style="width:5%">#</th>
+          <th style="width:40%">課程名稱</th>
+          <th style="width:12%;text-align:right;">選課人數</th>
+          <th style="width:43%">類別內佔比</th>
+        </tr></thead>
+        <tbody id="grouped-tbl"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">全體課程人數排行（前 30 名）</div>
+    <div class="chart-wrap" style="height:1300px;">
+      <canvas id="topChart" role="img" aria-label="前30名課程人數橫向長條圖">Writing 11-Writing 最高 47人</canvas>
+    </div>
+  </div>
+
+</main>
+
+<footer>
+  <span>WIST EdTech &amp; Innovation · 114學年度選課統計</span>
+  <span>分析日期：2026年5月</span>
+</footer>
+
+<script>
+const CAT_COLORS = {
+  'Senior Electives':       '#2f81f7',
+  'Junior Electives':       '#3fb950',
+  'Core Electives 1':       '#d2a8ff',
+  'Core Electives 2':       '#a371f7',
+  'Visual Performing Arts': '#ffa657',
+  'World Language':         '#79c0ff',
+  'Electives 1 (G10)':      '#56d364',
+  'Electives 2 (G11)':      '#f0883e',
+  'Electives 3 (G11)':      '#ffa198',
+  'Writing 11':             '#ff7b72',
+  'Literature 12':          '#f778ba',
+  'Writing 12':             '#d29922',
+  'Electives 1 (G12)':      '#58a6ff',
+  'Electives 2 (G12)':      '#1f6feb',
+  'Electives 3 (G12)':      '#388bfd',
+  'Electives 4 (G12)':      '#7d8590',
+  'Electives 5 (G12)':      '#b1bac4',
+};
+
+const CAT_GRADE = {
+  'Junior Electives':       'G7–9',
+  'Core Electives 1':       'G10',
+  'Core Electives 2':       'G10',
+  'Electives 1 (G10)':      'G10',
+  'Visual Performing Arts': 'G11',
+  'World Language':         'G11',
+  'Electives 2 (G11)':      'G11',
+  'Electives 3 (G11)':      'G11',
+  'Writing 11':             'G11',
+  'Literature 12':          'G12',
+  'Writing 12':             'G12',
+  'Electives 1 (G12)':      'G12',
+  'Electives 2 (G12)':      'G12',
+  'Electives 3 (G12)':      'G12',
+  'Electives 4 (G12)':      'G12',
+  'Electives 5 (G12)':      'G12',
+  'Senior Electives':       'G12',
+};
+
+// Ordered: grade first, then category within grade
+const CAT_ORDER = [
+  'Junior Electives',
+  'Core Electives 1','Core Electives 2','Electives 1 (G10)',
+  'Visual Performing Arts','World Language','Writing 11','Electives 2 (G11)','Electives 3 (G11)',
+  'Literature 12','Writing 12','Senior Electives',
+  'Electives 1 (G12)','Electives 2 (G12)','Electives 3 (G12)','Electives 4 (G12)','Electives 5 (G12)',
+];
+
+const DATA = {
+  "Writing 11":[{"course":"Writing 11-Writing","count":47},{"course":"Writing 11-Honors Academic Writing","count":6},{"course":"Writing 11-AP Seminar","count":1}],
+  "Visual Performing Arts":[{"course":"Visual Performing Arts G11-Music","count":34},{"course":"Visual Performing Arts G10-Music","count":20},{"course":"Visual Performing Arts G11-Art","count":20},{"course":"Visual Performing Arts G10-Art","count":17},{"course":"Visual Performing Arts G10-Drama","count":5}],
+  "World Language":[{"course":"World Language-Spanish I","count":28},{"course":"World Language-Spanish II","count":23},{"course":"World Language-Japanese I","count":15},{"course":"World Language-Japanese II","count":11},{"course":"World Language-French I","count":9},{"course":"World Language-French II","count":7},{"course":"World Language-German I","count":1},{"course":"World Language-Korean II","count":1}],
+  "Core Electives 2":[{"course":"Core Electives 2-Chemistry I","count":23},{"course":"Core Electives 2-Introduction to US History","count":20},{"course":"Core Electives 2-Physics I","count":19},{"course":"Core Electives 2-Introduction to European History","count":13},{"course":"Core Electives 2 (G10)-AP Human Geography","count":6},{"course":"Core Electives 2 (G11)-AP Psychology","count":6},{"course":"Core Electives 2 (G10)-AP World History: Modern","count":5},{"course":"Core Electives 2 (G10)-AP Psychology","count":2},{"course":"Core Electives 2 (G11)-AP World History: Modern","count":1},{"course":"Core Electives 2-Biology I","count":1}],
+  "Electives 2 (G11)":[{"course":"Electives 2 (G11)-SDGs/Service Learning","count":22},{"course":"Electives 2 (G11)-AP Precalculus","count":12},{"course":"Electives 2 (G11)-Cybersecurity Essentials","count":7},{"course":"Electives 2 (G11)-Advanced Painting","count":5},{"course":"Electives 2 (G11)-AP Calculus BC","count":4},{"course":"Electives 2 (G11)-Self-Directed Learning","count":3},{"course":"Electives 2 (G11)-AP Calculus AB","count":1}],
+  "Core Electives 1":[{"course":"Core Electives 1-Introduction to Modern World History","count":21},{"course":"Core Electives 1-Physics I","count":20},{"course":"Core Electives 1 (G11)-AP Microeconomics","count":20},{"course":"Core Electives 1-Chemistry I","count":18},{"course":"Core Electives 1 (G11)-Honors Chemistry II","count":5},{"course":"Core Electives 1-Introduction to Psychology","count":4},{"course":"Core Electives 1-Introduction to Human Geography","count":3},{"course":"Core Electives 1 (G10)-AP US History","count":2},{"course":"Core Electives 1 (G11)-AP US History","count":1}],
+  "Electives 2 (G12)":[{"course":"Electives 2 (G12)-Organizational Behaviour","count":21},{"course":"Electives 2 (G12)-Entrepreneurship","count":17},{"course":"Electives 2 (G12)-3D Modeling with Blender","count":20},{"course":"Electives 2 (G12)-AP Calculus BC","count":7},{"course":"Electives 2 (G12)-AP Calculus AB","count":3},{"course":"Electives 2 (G12)-AP Statistics","count":1},{"course":"Electives 2 (G12)-Precalculus","count":1}],
+  "Electives 1 (G10)":[{"course":"Electives 1 (G10)-IELTS Preparation","count":20},{"course":"Electives 1 (G10)-SAT Preparation","count":9},{"course":"Electives 1 (G10)-AP Precalculus","count":8},{"course":"Electives 1 (G10)-TOEFL Preparation","count":4},{"course":"Electives 1 (G10)-Chinese Language and Culture","count":1}],
+  "Electives 1 (G12)":[{"course":"Electives 1 (G12)-AP Chemistry","count":12},{"course":"Electives 1 (G12)-Statistics","count":10},{"course":"Electives 1 (G12)-Introduction to Art History","count":8},{"course":"Electives 1 (G12)-Biology I","count":1}],
+  "Junior Electives":[{"course":"Junior Electives-Creative Painting","count":19},{"course":"Junior Electives-IELTS Preparation","count":14},{"course":"Junior Electives-Mind Games:Psychology in Action","count":14},{"course":"Junior Electives-Junior Game Design","count":12},{"course":"Junior Electives-Junior Engineering Design","count":12},{"course":"Junior Electives-Beginning Programming in C","count":11},{"course":"Junior Electives-Remedial Math G8","count":6},{"course":"Junior Electives-Science Inquiry Project","count":6},{"course":"Junior Electives-Grammar for Better Writing","count":5},{"course":"Junior Electives-Intermediate Programming in C","count":5},{"course":"Junior Electives-Novel Study","count":4},{"course":"Junior Electives-Computer Science Discoveries","count":1}],
+  "Senior Electives":[{"course":"Senior Electives-App Design","count":19},{"course":"Senior Electives-Business Management and Economics","count":16},{"course":"Senior Electives-Physics I","count":14},{"course":"Senior Electives-AP Computer Science","count":13},{"course":"Senior Electives-AP 2D Arts and Design","count":11},{"course":"Senior Electives-Business Management","count":11},{"course":"Senior Electives-AP Business and Personal Finance","count":10},{"course":"Senior Electives-Student Journalism","count":10},{"course":"Senior Electives-AP Physics I","count":9},{"course":"Senior Electives-Chemistry I","count":8},{"course":"Senior Electives-Model United Nations","count":8},{"course":"Senior Electives-AP Biology","count":6},{"course":"Senior Electives-Senior Robotics","count":5},{"course":"Senior Electives-AP Physics C","count":5},{"course":"Senior Electives-AP Statistics","count":2}],
+  "Literature 12":[{"course":"Literature 12-Literature Criticism and Analysis","count":19},{"course":"Literature 12-Literary Skills and Concepts","count":15},{"course":"Literature 12-British Literature","count":11},{"course":"Literature 12-Literature for Arts and Humanities","count":6}],
+  "Electives 3 (G12)":[{"course":"Electives 3 (G12)-Art Design Portfolio","count":19},{"course":"Electives 3 (G12)-Marketing","count":12},{"course":"Electives 3 (G12)-AP Macroeconomics","count":10},{"course":"Electives 3 (G12)-Engineering Capstone Project","count":9},{"course":"Electives 3 (G12)-AP US History","count":1}],
+  "Electives 4 (G12)":[{"course":"Electives 4 (G12)-Career Planning/ Self-Directed Learning","count":18},{"course":"Electives 4 (G12)-Advanced Painting","count":8},{"course":"Electives 4 (G12)-AP Calculus BC","count":8},{"course":"Electives 4 (G12)-Service Learning Projects","count":8},{"course":"Electives 4 (G12)-Cybersecurity Essentials","count":6},{"course":"Electives 4 (G12)-AP Calculus AB","count":3}],
+  "Electives 3 (G11)":[{"course":"Electives 3 (G11)-Self-Directed Learning","count":17},{"course":"Electives 3 (G11)-Advanced Programming in Java","count":11},{"course":"Electives 3 (G11)-Japanese II","count":7},{"course":"Electives 3 (G11)-Spanish II","count":7},{"course":"Electives 3 (G11)-Honors Chemistry II","count":5},{"course":"Electives 3 (G11)-French II","count":3},{"course":"Electives 3 (G11)-Korean II","count":2},{"course":"Electives 3 (G11)-Spanish III","count":1},{"course":"Electives 3 (G11)-Spanish I","count":1}],
+  "Electives 5 (G12)":[{"course":"Electives 5 (G12)-Aeronautics  II","count":16},{"course":"Electives 5 (G12)-International Business","count":13},{"course":"Electives 5 (G12)-AP Chemistry","count":12},{"course":"Electives 5 (G12)-Computers in Art and Design","count":10}],
+  "Writing 12":[{"course":"Writing 12-Writing for Science Research","count":13},{"course":"Writing 12-Foundations of Academic Writing","count":12},{"course":"Writing 12-AP Research","count":9},{"course":"Writing 12-Writing for Social Science & Humanities","count":9},{"course":"Writing 12-Writing for Business & Finance","count":8}]
+};
+
+const catTotals = {
+  'Senior Electives':147,'Junior Electives':109,'Core Electives 2':96,
+  'Visual Performing Arts':96,'World Language':95,'Core Electives 1':94,
+  'Electives 2 (G11)':54,'Electives 3 (G11)':54,'Writing 11':54,
+  'Literature 12':51,'Writing 12':51,'Electives 1 (G12)':51,
+  'Electives 3 (G12)':51,'Electives 4 (G12)':51,'Electives 5 (G12)':51,
+  'Electives 2 (G12)':50,'Electives 1 (G10)':42
+};
+
+const maxCatTotal = Math.max(...Object.values(catTotals));
+
+// ── Category bar chart ──
+const sorted = Object.entries(catTotals).sort((a,b)=>b[1]-a[1]);
+const legEl = document.getElementById('cat-legend');
+sorted.forEach(([cat,val])=>{
+  legEl.innerHTML += `<span><b style="background:${CAT_COLORS[cat]}"></b>${cat} (${val})</span>`;
+});
+
+new Chart(document.getElementById('catChart'),{
+  type:'bar',
+  data:{
+    labels: sorted.map(([c])=>c),
+    datasets:[{
+      label:'選課人數',
+      data: sorted.map(([,v])=>v),
+      backgroundColor: sorted.map(([c])=>CAT_COLORS[c]+'cc'),
+      borderColor: sorted.map(([c])=>CAT_COLORS[c]),
+      borderWidth:1, borderRadius:4, borderSkipped:false,
+    }]
+  },
+  options:{
+    indexAxis:'y', responsive:true, maintainAspectRatio:false,
+    plugins:{
+      legend:{display:false},
+      tooltip:{
+        backgroundColor:'#161b22',borderColor:'rgba(255,255,255,0.1)',borderWidth:1,
+        titleColor:'#e6edf3',bodyColor:'#7d8590',
+        callbacks:{label:ctx=>`  ${ctx.raw} 人`}
+      }
+    },
+    scales:{
+      x:{ grid:{color:'rgba(255,255,255,0.05)'}, ticks:{color:'#7d8590',font:{size:11,family:'DM Mono'}} },
+      y:{ grid:{display:false}, ticks:{color:'#b1bac4',font:{size:11}} }
+    }
+  }
+});
+
+// ── Grade tabs ──
+const GRADES = ['全部','G7–9','G10','G11','G12'];
+let activeGrade = '全部';
+let sortMode = 'count';
+const collapsedGroups = new Set();
+
+const gradeTabsEl = document.getElementById('grade-tabs');
+GRADES.forEach(g => {
+  const b = document.createElement('button');
+  b.className = 'gtab' + (g === activeGrade ? ' active' : '');
+  b.textContent = g;
+  b.onclick = () => { activeGrade = g; renderGradeTabs(); renderGroupedTable(); };
+  gradeTabsEl.appendChild(b);
+});
+
+function renderGradeTabs() {
+  gradeTabsEl.querySelectorAll('.gtab').forEach(b => {
+    b.classList.toggle('active', b.textContent === activeGrade);
+  });
+}
+
+function setSort(mode) {
+  sortMode = mode;
+  document.getElementById('sort-count').classList.toggle('active', mode==='count');
+  document.getElementById('sort-alpha').classList.toggle('active', mode==='alpha');
+  renderGroupedTable();
+}
+
+function shortName(full) {
+  const idx = full.indexOf('-');
+  return idx > -1 ? full.slice(idx+1).trim() : full;
+}
+
+// Insert grade section divider rows
+function renderGroupedTable() {
+  let catsToShow = CAT_ORDER;
+  if (activeGrade !== '全部') {
+    catsToShow = CAT_ORDER.filter(cat => CAT_GRADE[cat] === activeGrade);
+  }
+
+  const tbl = document.getElementById('grouped-tbl');
+  tbl.innerHTML = '';
+  let globalRank = 1;
+  let lastGrade = null;
+
+  catsToShow.forEach(cat => {
+    if (!DATA[cat]) return;
+    const color = CAT_COLORS[cat] || '#2f81f7';
+    const total = catTotals[cat] || 0;
+    const grade = CAT_GRADE[cat] || '';
+    const isCollapsed = collapsedGroups.has(cat);
+    const catPct = Math.round(total / maxCatTotal * 100);
+
+    // Grade section divider (only in 全部 mode or if first entry)
+    if (activeGrade === '全部' && grade !== lastGrade) {
+      lastGrade = grade;
+      const dtr = document.createElement('tr');
+      dtr.innerHTML = `<td colspan="4" style="
+        background:#0d1117;
+        font-family:'DM Mono',monospace;
+        font-size:10px;
+        letter-spacing:0.12em;
+        color:#7d8590;
+        padding:12px 12px 6px;
+        border-bottom:none;
+        border-top: 2px solid rgba(255,255,255,0.07);
+      ">── ${grade} ──────────────</td>`;
+      tbl.appendChild(dtr);
+    }
+
+    // Group header
+    const htr = document.createElement('tr');
+    htr.className = 'group-header';
+    htr.innerHTML = `<td colspan="4">
+      <div class="gh-inner">
+        <span class="gh-chevron ${isCollapsed ? '' : 'open'}">▶</span>
+        <span style="color:${color};font-size:13px;line-height:1;">●</span>
+        <span style="color:var(--text);font-size:12px;">${cat}</span>
+        <span class="gh-grade">${grade}</span>
+        <span class="gh-count" style="color:${color};">${total} 人</span>
+        <div class="gh-bar-wrap">
+          <div class="gh-bar-bg"><div class="gh-bar-fill" style="width:${catPct}%;background:${color};"></div></div>
+        </div>
+      </div>
+    </td>`;
+    htr.onclick = () => {
+      if (collapsedGroups.has(cat)) collapsedGroups.delete(cat);
+      else collapsedGroups.add(cat);
+      renderGroupedTable();
+    };
+    tbl.appendChild(htr);
+
+    if (!isCollapsed) {
+      let courses = [...DATA[cat]];
+      if (sortMode === 'count') courses.sort((a,b)=>b.count-a.count);
+      else courses.sort((a,b)=>shortName(a.course).localeCompare(shortName(b.course)));
+
+      const catMax = Math.max(...courses.map(c=>c.count));
+      courses.forEach((c) => {
+        const pct = Math.round(c.count / catMax * 100);
+        const sharePct = Math.round(c.count / total * 100);
+        const tr = document.createElement('tr');
+        tr.className = 'data-row';
+        tr.innerHTML = `
+          <td class="mono" style="color:var(--muted);font-size:11px;padding-left:22px;">${globalRank++}</td>
+          <td style="word-break:break-word;padding-left:30px;">${shortName(c.course)}</td>
+          <td style="text-align:right;" class="mono">${c.count}</td>
+          <td>
+            <div style="display:flex;align-items:center;gap:8px;">
+              <div class="bar-bg" style="flex:1;">
+                <div class="bar-fill" style="width:${pct}%;background:${color};"></div>
+              </div>
+              <span style="font-family:'DM Mono',monospace;font-size:11px;color:var(--muted);min-width:34px;text-align:right;">${sharePct}%</span>
+            </div>
+          </td>`;
+        tbl.appendChild(tr);
+      });
+    } else {
+      globalRank += DATA[cat].length;
+    }
+  });
+}
+
+renderGroupedTable();
+
+// ── Top 30 ──
+const allCourses = [];
+Object.entries(DATA).forEach(([cat,courses])=>{
+  courses.forEach(c=>allCourses.push({name:shortName(c.course),count:c.count,color:CAT_COLORS[cat]||'#2f81f7'}));
+});
+allCourses.sort((a,b)=>b.count-a.count);
+const top30 = allCourses.slice(0,30);
+
+new Chart(document.getElementById('topChart'),{
+  type:'bar',
+  data:{
+    labels: top30.map(c=>c.name),
+    datasets:[{
+      label:'人數',
+      data: top30.map(c=>c.count),
+      backgroundColor: top30.map(c=>c.color+'bb'),
+      borderColor: top30.map(c=>c.color),
+      borderWidth:1, borderRadius:3, borderSkipped:false,
+    }]
+  },
+  options:{
+    indexAxis:'y', responsive:true, maintainAspectRatio:false,
+    plugins:{
+      legend:{display:false},
+      tooltip:{
+        backgroundColor:'#161b22',borderColor:'rgba(255,255,255,0.1)',borderWidth:1,
+        titleColor:'#e6edf3',bodyColor:'#7d8590',
+        callbacks:{label:ctx=>`  ${ctx.raw} 人`}
+      }
+    },
+    scales:{
+      x:{ grid:{color:'rgba(255,255,255,0.05)'}, ticks:{color:'#7d8590',font:{size:11,family:'DM Mono'}} },
+      y:{ grid:{display:false}, ticks:{color:'#b1bac4',font:{size:10}} }
+    }
+  }
+});
+</script>
+</body>
+</html>
